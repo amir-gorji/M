@@ -14,7 +14,7 @@ Kitsune is a GitHub Copilot Chat participant (`@kitsune`) that:
 
 | Feature | Details |
 |---|---|
-| **Multi-provider PR support** | GitHub, GitHub Enterprise, Azure DevOps (dev.azure.com + visualstudio.com), GitLab (cloud + self-hosted), Bitbucket Cloud, Bitbucket Server |
+| **Multi-provider PR support** | GitHub, GitHub Enterprise, Azure DevOps (Microsoft-hosted, custom domain, and server/on-prem), GitLab (cloud + self-hosted), Bitbucket Cloud, Bitbucket Server |
 | **Intelligent pattern detection** | Recognises 15+ migration patterns (React 17→18, Redux Toolkit, Vue 3, TS migration, Vitest, Vite, Prisma→Drizzle, and more) |
 | **AI-assisted deep analysis** | Uses GitHub Copilot to summarise the migration intent beyond what pattern matching can detect |
 | **Contextual questionnaire** | Multi-turn conversation that collects your approach, scope, testing strategy, team size, rollback plan, and known pitfalls |
@@ -63,6 +63,8 @@ Kitsune will:
 | **GitHub Enterprise** | `https://{host}/{owner}/{repo}/pull/{number}` |
 | **Azure DevOps** | `https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}` |
 | **Azure DevOps (legacy)** | `https://{org}.visualstudio.com/{project}/_git/{repo}/pullrequest/{id}` |
+| **Azure DevOps (custom domain)** | `https://{host}/{project}/_git/{repo}/pullrequest/{id}` |
+| **Azure DevOps Server / on-prem** | `https://{host}/{collection}/{project}/_git/{repo}/pullrequest/{id}` |
 | **GitLab** | `https://gitlab.com/{namespace}/{repo}/-/merge_requests/{id}` |
 | **GitLab (self-hosted)** | `https://{host}/{namespace}/{repo}/-/merge_requests/{id}` |
 | **Bitbucket Cloud** | `https://bitbucket.org/{workspace}/{repo}/pull-requests/{id}` |
