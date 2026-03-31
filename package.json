@@ -1,0 +1,111 @@
+{
+  "name": "kitsune",
+  "displayName": "Kitsune — Migration Agent",
+  "description": "AI-powered PR-based migration guide generator. Analyzes a sample PR, asks clarifying questions, and generates a comprehensive, AI-ready migration guide for your entire codebase.",
+  "version": "0.1.0",
+  "publisher": "kitsune",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["AI", "Other"],
+  "keywords": ["migration", "copilot", "agent", "refactoring", "codemod"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "kitsune",
+        "name": "kitsune",
+        "fullName": "Kitsune Migration Agent",
+        "description": "Analyze a PR as a migration sample, ask clarifying questions, and generate an AI-ready migration playbook.",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "analyze",
+            "description": "Provide a PR/MR URL to analyze as a migration sample"
+          },
+          {
+            "name": "generate",
+            "description": "Generate the migration guide from collected answers"
+          },
+          {
+            "name": "scan",
+            "description": "Scan workspace to count migration targets"
+          },
+          {
+            "name": "reset",
+            "description": "Start a fresh migration session"
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "Kitsune Migration Agent",
+      "properties": {
+        "kitsune.github.token": {
+          "type": "string",
+          "markdownDescription": "GitHub personal access token for accessing private repositories. Create one at https://github.com/settings/tokens",
+          "default": ""
+        },
+        "kitsune.azureDevOps.token": {
+          "type": "string",
+          "markdownDescription": "Azure DevOps personal access token (PAT). Create one at https://dev.azure.com",
+          "default": ""
+        },
+        "kitsune.gitlab.token": {
+          "type": "string",
+          "markdownDescription": "GitLab personal access token. Create one at your GitLab instance under User Settings > Access Tokens",
+          "default": ""
+        },
+        "kitsune.bitbucket.username": {
+          "type": "string",
+          "description": "Bitbucket username for authentication",
+          "default": ""
+        },
+        "kitsune.bitbucket.appPassword": {
+          "type": "string",
+          "markdownDescription": "Bitbucket app password. Create one at https://bitbucket.org/account/settings/app-passwords/",
+          "default": ""
+        },
+        "kitsune.outputDirectory": {
+          "type": "string",
+          "default": ".kitsune",
+          "description": "Workspace-relative directory where migration guides are saved"
+        },
+        "kitsune.questionsPerBatch": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "How many clarifying questions to ask per conversation turn"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "kitsune.openLatestGuide",
+        "title": "Kitsune: Open Latest Migration Guide"
+      },
+      {
+        "command": "kitsune.clearSession",
+        "title": "Kitsune: Clear Current Session"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^20.x",
+    "typescript": "^5.4.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/vsce": "^2.26.0"
+  }
+}
