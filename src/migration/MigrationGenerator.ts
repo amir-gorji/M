@@ -7,11 +7,9 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'node:path';
 import type {
   MigrationAnalysis,
   MigrationDocument,
-  MigrationPhase,
   PRInfo,
   UserMigrationPreferences,
 } from '../types.js';
@@ -22,8 +20,12 @@ import { buildPhases } from './StepSequencer.js';
 export async function generateMigrationGuide(
   pr: PRInfo,
   analysis: MigrationAnalysis,
-  prefs: Partial<UserMigrationPreferences>
-): Promise<{ document: MigrationDocument; markdown: string; filePath: string }> {
+  prefs: Partial<UserMigrationPreferences>,
+): Promise<{
+  document: MigrationDocument;
+  markdown: string;
+  filePath: string;
+}> {
   const approach = prefs.approach ?? 'step-by-step';
   const phases = buildPhases(prefs, approach);
 
@@ -55,13 +57,13 @@ function buildTitle(analysis: MigrationAnalysis): string {
     return `Migration: ${analysis.fromTechnology} → ${analysis.toTechnology}`;
   }
   const type = analysis.migrationTypes[0] ?? 'unknown';
-  return `Migration Guide — ${type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`;
+  return `Migration Guide — ${type.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}`;
 }
 
 // ─── Automation script ────────────────────────────────────────────────────────
 
 function buildAutomationScript(analysis: MigrationAnalysis): string {
-  const patterns = analysis.searchPatterns.filter(p => p.regex);
+  const patterns = analysis.searchPatterns.filter((p) => p.regex);
   if (patterns.length === 0) {
     return '#!/bin/bash\n# No automated search patterns detected for this migration.';
   }
@@ -79,11 +81,13 @@ function buildAutomationScript(analysis: MigrationAnalysis): string {
   for (const p of patterns) {
     lines.push(`# ${p.description}`);
     if (p.regex) {
-      const glob = p.fileGlob ? `--include="${p.fileGlob.replace('**/', '')}"` : '';
+      const glob = p.fileGlob
+        ? `--include="${p.fileGlob.replace('**/', '')}"`
+        : '';
       lines.push(
         `echo "--- ${p.description} ---"`,
         `grep -rn "${p.regex.replace(/"/g, '\\"')}" ${glob} --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null | head -50`,
-        ''
+        '',
       );
     }
   }
@@ -96,34 +100,52 @@ function buildAutomationScript(analysis: MigrationAnalysis): string {
 
 function buildPitfalls(
   analysis: MigrationAnalysis,
-  prefs: Partial<UserMigrationPreferences>
+  prefs: Partial<UserMigrationPreferences>,
 ): import('../types.js').Pitfall[] {
   const pitfalls: import('../types.js').Pitfall[] = [
     {
       name: 'Deleting exports before updating all import sites',
-      description: 'Removing a function/type/module before all files that import it have been updated causes cascading TypeScript errors across the codebase.',
-      avoidance: 'Always update all consumers of a module before deleting or renaming the module. Use the search patterns in this guide to find every import site.',
+      description:
+        'Removing a function/type/module before all files that import it have been updated causes cascading TypeScript errors across the codebase.',
+      avoidance:
+        'Always update all consumers of a module before deleting or renaming the module. Use the search patterns in this guide to find every import site.',
     },
     {
       name: 'Fixing errors that belong to a future step',
-      description: 'When migrating file A, you may see type errors caused by un-migrated file B. Fixing them prematurely creates merge conflicts when B is later migrated.',
-      avoidance: 'Use `// @ts-ignore` or `// @ts-expect-error` sparingly to suppress cross-file errors that will be resolved when the dependent file is migrated. Remove these suppressions in Phase 6.',
+      description:
+        'When migrating file A, you may see type errors caused by un-migrated file B. Fixing them prematurely creates merge conflicts when B is later migrated.',
+      avoidance:
+        'Use `// @ts-ignore` or `// @ts-expect-error` sparingly to suppress cross-file errors that will be resolved when the dependent file is migrated. Remove these suppressions in Phase 6.',
     },
     {
       name: 'Ignoring transitive dependencies',
-      description: 'File C may not directly import the old library, but file A does, and C imports A. Migrating only A and C may still leave broken references.',
-      avoidance: 'Run a dependency graph analysis (`npx madge` or `npx depcruise`) to understand full transitive dependencies before determining migration order.',
+      description:
+        'File C may not directly import the old library, but file A does, and C imports A. Migrating only A and C may still leave broken references.',
+      avoidance:
+        'Run a dependency graph analysis (`npx madge` or `npx depcruise`) to understand full transitive dependencies before determining migration order.',
     },
-    ...(prefs.requiresCoexistence ? [{
-      name: 'State desynchronisation during coexistence',
-      description: 'When old and new code share state (cache, database, session), writes from one can break the other.',
-      avoidance: 'Use an adapter or dual-write strategy to keep state in sync. Test all combinations of old/new code paths reading and writing state.',
-    }] : []),
-    ...(prefs.testingStrategy === 'big-bang' ? [{
-      name: 'Untested migration',
-      description: 'Migrating without running tests per file makes it hard to locate the source of regressions.',
-      avoidance: 'Even with a big-bang approach, run the test suite after each major phase to catch regressions early.',
-    }] : []),
+    ...(prefs.requiresCoexistence
+      ? [
+          {
+            name: 'State desynchronisation during coexistence',
+            description:
+              'When old and new code share state (cache, database, session), writes from one can break the other.',
+            avoidance:
+              'Use an adapter or dual-write strategy to keep state in sync. Test all combinations of old/new code paths reading and writing state.',
+          },
+        ]
+      : []),
+    ...(prefs.approach === 'big-bang'
+      ? [
+          {
+            name: 'Untested migration',
+            description:
+              'Migrating without running tests per file makes it hard to locate the source of regressions.',
+            avoidance:
+              'Even with a big-bang approach, run the test suite after each major phase to catch regressions early.',
+          },
+        ]
+      : []),
   ];
 
   // Add developer-specified pitfalls
@@ -131,7 +153,7 @@ function buildPitfalls(
     pitfalls.push({
       name: 'Developer-identified pitfall',
       description: p,
-      avoidance: 'See your team\'s internal documentation.',
+      avoidance: "See your team's internal documentation.",
     });
   }
 
@@ -149,9 +171,11 @@ function buildRollbackPlan(prefs: Partial<UserMigrationPreferences>): string[] {
     ...custom,
     'Keep the migration on a dedicated branch until fully validated.',
     'If critical issues are found after merge, use `git revert` to undo the migration commits.',
-    ...(prefs.requiresCoexistence ? [
-      'Toggle the feature flag to route 100% traffic back to the old implementation.',
-    ] : []),
+    ...(prefs.requiresCoexistence
+      ? [
+          'Toggle the feature flag to route 100% traffic back to the old implementation.',
+        ]
+      : []),
     'Pin dependencies to the old versions in `package.json` as an emergency fallback.',
     'Keep the migration guide in `docs/migrations/` so future rollbacks can reference the original state.',
   ];
@@ -161,18 +185,21 @@ function buildRollbackPlan(prefs: Partial<UserMigrationPreferences>): string[] {
 
 function buildValidationChecklist(
   analysis: MigrationAnalysis,
-  prefs: Partial<UserMigrationPreferences>
+  prefs: Partial<UserMigrationPreferences>,
 ): string[] {
   return [
     '`tsc --noEmit` exits with code 0 (zero type errors)',
     'ESLint exits with code 0 (zero lint errors)',
     'All unit tests pass',
     'All integration tests pass',
-    ...(prefs.testingStrategy === 'e2e-gated' || prefs.testingStrategy === 'parallel'
+    ...(prefs.testingStrategy === 'e2e-gated' ||
+    prefs.testingStrategy === 'parallel'
       ? ['All E2E tests pass']
       : []),
     ...(analysis.isBreakingChange
-      ? ['External API consumers have been notified and tested against the new API']
+      ? [
+          'External API consumers have been notified and tested against the new API',
+        ]
       : []),
     'No `// @ts-ignore` or `// @ts-expect-error` comments remain (added during migration)',
     'No old import patterns remain (re-run search patterns from this guide)',
@@ -191,7 +218,9 @@ function buildValidationChecklist(
 function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
   const { analysis, preferences: prefs, phases } = doc;
   const date = doc.generatedAt.toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   });
 
   const lines: string[] = [
@@ -222,7 +251,7 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
     '',
     `The sample PR (\`${pr.sourceBranch}\` → \`${pr.targetBranch}\`) modifies **${pr.files.length} file(s)** and shows:`,
     '',
-    ...analysis.migrationTypes.map(t => `- ${formatMigrationType(t)}`),
+    ...analysis.migrationTypes.map((t) => `- ${formatMigrationType(t)}`),
     '',
   ];
 
@@ -239,9 +268,12 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
   if (analysis.dependencyChanges.length > 0) {
     lines.push('### Dependency Changes', '');
     for (const dc of analysis.dependencyChanges) {
-      const ver = dc.oldVersion && dc.newVersion
-        ? ` (${dc.oldVersion} → ${dc.newVersion})`
-        : dc.newVersion ? ` (${dc.newVersion})` : '';
+      const ver =
+        dc.oldVersion && dc.newVersion
+          ? ` (${dc.oldVersion} → ${dc.newVersion})`
+          : dc.newVersion
+            ? ` (${dc.newVersion})`
+            : '';
       lines.push(`- **${dc.type.toUpperCase()}**: \`${dc.name}\`${ver}`);
     }
     lines.push('');
@@ -250,8 +282,10 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
   if (analysis.fileChanges.length > 0) {
     lines.push('### File Structure Changes', '');
     for (const fc of analysis.fileChanges) {
-      lines.push(`- **${fc.type.toUpperCase()}**: \`${fc.newPath}\`` +
-        (fc.oldPath ? ` (was \`${fc.oldPath}\`)` : ''));
+      lines.push(
+        `- **${fc.type.toUpperCase()}**: \`${fc.newPath}\`` +
+          (fc.oldPath ? ` (was \`${fc.oldPath}\`)` : ''),
+      );
     }
     lines.push('');
   }
@@ -293,7 +327,9 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
     '- [ ] Ensure the test suite passes on the current `main` branch',
     '- [ ] Create a migration branch: `git checkout -b migration/<name>`',
     '- [ ] Communicate the migration plan to the team',
-    ...(analysis.isBreakingChange ? ['- [ ] Notify external consumers of upcoming breaking changes'] : []),
+    ...(analysis.isBreakingChange
+      ? ['- [ ] Notify external consumers of upcoming breaking changes']
+      : []),
     '',
   );
 
@@ -340,7 +376,9 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
       }
       if (s.codeChanges && s.codeChanges.length > 0) {
         for (const cc of s.codeChanges) {
-          if (cc.description) { lines.push(cc.description, ''); }
+          if (cc.description) {
+            lines.push(cc.description, '');
+          }
           if (cc.before && cc.after) {
             lines.push(`**Before:**`);
             lines.push(`\`\`\`${cc.language ?? ''}`);
@@ -389,12 +427,7 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
   }
 
   // ── Common pitfalls ────────────────────────────────────────────────────
-  lines.push(
-    '---',
-    '',
-    '## Common Pitfalls',
-    '',
-  );
+  lines.push('---', '', '## Common Pitfalls', '');
   for (let i = 0; i < doc.commonPitfalls.length; i++) {
     const p = doc.commonPitfalls[i]!;
     lines.push(
@@ -415,7 +448,7 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
     '',
     'If critical issues are found after migration:',
     '',
-    ...doc.rollbackPlan.map(r => `- ${r}`),
+    ...doc.rollbackPlan.map((r) => `- ${r}`),
     '',
   );
 
@@ -427,7 +460,7 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
     '',
     'Complete all items before considering the migration done:',
     '',
-    ...doc.validationChecklist.map(item => `- [ ] ${item}`),
+    ...doc.validationChecklist.map((item) => `- [ ] ${item}`),
     '',
   );
 
@@ -449,14 +482,16 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
     `| Breaking for consumers | ${prefs.isBreakingForConsumers ? 'Yes' : 'No'} |`,
     `| Requires source review | ${prefs.requiresSourceReview ? 'Yes' : 'No'} |`,
     '',
-    prefs.additionalNotes ? `**Additional notes from the developer:**\n\n${prefs.additionalNotes}\n` : '',
+    prefs.additionalNotes
+      ? `**Additional notes from the developer:**\n\n${prefs.additionalNotes}\n`
+      : '',
     '',
     '---',
     '',
     '_Generated by [Kitsune Migration Agent](https://github.com/amir-gorji/M) for GitHub Copilot_',
   );
 
-  return lines.filter(l => l !== undefined).join('\n');
+  return lines.filter((l) => l !== undefined).join('\n');
 }
 
 // ─── File saving ──────────────────────────────────────────────────────────────
@@ -464,7 +499,9 @@ function renderMarkdown(doc: MigrationDocument, pr: PRInfo): string {
 async function saveGuide(markdown: string, title: string): Promise<string> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders?.[0]) {
-    throw new Error('No workspace is open. Please open a folder and try again.');
+    throw new Error(
+      'No workspace is open. Please open a folder and try again.',
+    );
   }
 
   const cfg = vscode.workspace.getConfiguration('kitsune');
@@ -490,34 +527,51 @@ async function saveGuide(markdown: string, title: string): Promise<string> {
 
 function formatApproach(approach: string): string {
   switch (approach) {
-    case 'step-by-step': return 'Step-by-Step (Incremental)';
-    case 'big-bang': return 'Big Bang (All at Once)';
-    case 'vertical-slice': return 'Vertical Slice (Feature by Feature)';
-    case 'strangler-fig': return 'Strangler Fig (Progressive Replacement)';
-    default: return approach;
+    case 'step-by-step':
+      return 'Step-by-Step (Incremental)';
+    case 'big-bang':
+      return 'Big Bang (All at Once)';
+    case 'vertical-slice':
+      return 'Vertical Slice (Feature by Feature)';
+    case 'strangler-fig':
+      return 'Strangler Fig (Progressive Replacement)';
+    default:
+      return approach;
   }
 }
 
 function approachDescription(approach: string): string {
   switch (approach) {
     case 'step-by-step':
-      return 'Migrate one file at a time. After each file, the CI must be green. ' +
-        'This is the safest approach: regressions are caught immediately and rollback is trivial (revert one commit).';
+      return (
+        'Migrate one file at a time. After each file, the CI must be green. ' +
+        'This is the safest approach: regressions are caught immediately and rollback is trivial (revert one commit).'
+      );
     case 'big-bang':
-      return 'Migrate the entire codebase in a single branch. ' +
+      return (
+        'Migrate the entire codebase in a single branch. ' +
         'Fastest approach but highest risk. Requires thorough validation before merge. ' +
-        'Best when the migration is purely mechanical (e.g. a codemod) and the codebase has strong test coverage.';
+        'Best when the migration is purely mechanical (e.g. a codemod) and the codebase has strong test coverage.'
+      );
     case 'vertical-slice':
-      return 'Migrate one complete feature (from UI to data layer) before moving to the next. ' +
-        'Balances risk and speed. Each slice can be reviewed and tested independently.';
+      return (
+        'Migrate one complete feature (from UI to data layer) before moving to the next. ' +
+        'Balances risk and speed. Each slice can be reviewed and tested independently.'
+      );
     case 'strangler-fig':
-      return 'Run the old and new code simultaneously, gradually routing more traffic to the new implementation. ' +
-        'Safest for production systems. Allows instant rollback at any point by switching routing.';
-    default: return '';
+      return (
+        'Run the old and new code simultaneously, gradually routing more traffic to the new implementation. ' +
+        'Safest for production systems. Allows instant rollback at any point by switching routing.'
+      );
+    default:
+      return '';
   }
 }
 
-function approachRationale(approach: string, analysis: MigrationAnalysis): string {
+function approachRationale(
+  approach: string,
+  analysis: MigrationAnalysis,
+): string {
   if (approach === 'step-by-step') {
     return analysis.complexity === 'high'
       ? 'Given the high complexity of this migration, the step-by-step approach minimises risk and provides clear rollback points.'
@@ -536,5 +590,8 @@ function approachRationale(approach: string, analysis: MigrationAnalysis): strin
 }
 
 function formatMigrationType(t: string): string {
-  return t.split('-').map(w => w[0]!.toUpperCase() + w.slice(1)).join(' ');
+  return t
+    .split('-')
+    .map((w) => w[0]!.toUpperCase() + w.slice(1))
+    .join(' ');
 }

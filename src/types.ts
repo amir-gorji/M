@@ -15,9 +15,9 @@ export type PRProvider =
 export interface PRCoordinates {
   provider: PRProvider;
   url: string;
-  /** Canonical API base (e.g. https://api.github.com or https://dev.azure.com/org) */
+  /** Canonical API base (e.g. https://api.github.com or https://ado.company.com/tfs/DefaultCollection) */
   apiBase: string;
-  owner?: string;   // GitHub owner / ADO org / GitLab namespace
+  owner?: string; // GitHub owner / ADO org / GitLab namespace
   project?: string; // ADO project / GitLab group
   repo: string;
   prId: string;
@@ -164,7 +164,10 @@ export interface Question {
   /** Whether this question is required */
   required: boolean;
   /** Only ask if this condition is met */
-  condition?: (analysis: MigrationAnalysis, prefs: Partial<UserMigrationPreferences>) => boolean;
+  condition?: (
+    analysis: MigrationAnalysis,
+    prefs: Partial<UserMigrationPreferences>,
+  ) => boolean;
 }
 
 export interface AnsweredQuestion extends Question {
@@ -180,16 +183,16 @@ export interface QuestionBatch {
 // ─── User preferences (collected via questionnaire) ──────────────────────────
 
 export type MigrationApproach =
-  | 'step-by-step'    // One file at a time, safe and incremental
-  | 'big-bang'        // All at once
-  | 'vertical-slice'  // Feature by feature, full stack
-  | 'strangler-fig';  // Parallel operation, gradual replacement
+  | 'step-by-step' // One file at a time, safe and incremental
+  | 'big-bang' // All at once
+  | 'vertical-slice' // Feature by feature, full stack
+  | 'strangler-fig'; // Parallel operation, gradual replacement
 
 export type TestingStrategy =
-  | 'unit-first'        // Write/update unit tests before migrating each file
+  | 'unit-first' // Write/update unit tests before migrating each file
   | 'integration-first' // Focus on integration tests
-  | 'parallel'          // Run old and new tests simultaneously
-  | 'e2e-gated';        // Gate each phase on E2E test passing
+  | 'parallel' // Run old and new tests simultaneously
+  | 'e2e-gated'; // Gate each phase on E2E test passing
 
 export type TeamSize = 'solo' | 'small' | 'large';
 export type MigrationTimeline = 'immediate' | 'gradual' | 'long-term';

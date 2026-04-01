@@ -1,6 +1,6 @@
 /**
  * Azure DevOps PR provider.
- * Supports dev.azure.com and *.visualstudio.com organisations.
+ * Supports Microsoft-hosted URLs, custom domains, and server/on-prem path prefixes.
  * Uses Azure DevOps REST API 7.1.
  */
 
@@ -48,8 +48,8 @@ export class AzureDevOpsProvider {
   constructor(private readonly token?: string) {}
 
   async fetch(coords: PRCoordinates): Promise<PRInfo> {
-    const { apiBase, owner, project, repo, prId } = coords;
-    // ADO base: https://dev.azure.com/{org}
+    const { apiBase, project, repo, prId } = coords;
+    // apiBase preserves the original host and any server/on-prem collection prefix.
     const prBase = `${apiBase}/${project}/_apis/git/repositories/${repo}/pullRequests/${prId}`;
 
     const headers = this.headers();
@@ -60,7 +60,7 @@ export class AzureDevOpsProvider {
     // Fetch latest iteration id to get file changes
     const iterations = await httpGet<{ value: ADOIterationResponse[] }>(
       `${prBase}/iterations?${apiVer}`,
-      headers
+      headers,
     );
     const latestIteration = iterations.value[iterations.value.length - 1];
     const iterationId = latestIteration?.id ?? 1;
@@ -68,16 +68,16 @@ export class AzureDevOpsProvider {
     const [changesResp, commitsResp] = await Promise.all([
       httpGet<ADOChangesResponse>(
         `${prBase}/iterations/${iterationId}/changes?${apiVer}`,
-        headers
+        headers,
       ),
       httpGet<ADOCommitsResponse>(`${prBase}/commits?${apiVer}`, headers),
     ]);
 
-    const files: PRFile[] = changesResp.changeEntries.map(entry => ({
+    const files: PRFile[] = changesResp.changeEntries.map((entry) => ({
       path: entry.item.path.replace(/^\//, ''),
       status: this.mapChangeType(entry.changeType),
       oldPath: entry.sourceServerItem?.replace(/^\//, ''),
-      additions: 0,   // ADO changes API does not return line counts
+      additions: 0, // ADO changes API does not return line counts
       deletions: 0,
       patch: undefined, // ADO does not return unified diff per file at this endpoint
     }));
@@ -87,10 +87,13 @@ export class AzureDevOpsProvider {
     let fullDiff = '';
     try {
       // ADO returns a JSON diff, not a unified patch — we build a summary instead
-      fullDiff = `PR: ${pr.title}\n` +
-        files.map(f => `${f.status.toUpperCase()}: ${f.path}`).join('\n');
+      fullDiff =
+        `PR: ${pr.title}\n` +
+        files.map((f) => `${f.status.toUpperCase()}: ${f.path}`).join('\n');
     } catch {
-      fullDiff = files.map(f => `${f.status.toUpperCase()}: ${f.path}`).join('\n');
+      fullDiff = files
+        .map((f) => `${f.status.toUpperCase()}: ${f.path}`)
+        .join('\n');
     }
     void sourceCommit; // used for future diff fetch
 
@@ -103,7 +106,7 @@ export class AzureDevOpsProvider {
       targetBranch: pr.targetRefName.replace('refs/heads/', ''),
       state: pr.status,
       files,
-      commits: commitsResp.value.map(c => ({
+      commits: commitsResp.value.map((c) => ({
         sha: c.commitId.slice(0, 7),
         message: c.comment.split('\n')[0] ?? c.comment,
         author: c.author.name,
@@ -116,10 +119,18 @@ export class AzureDevOpsProvider {
 
   private mapChangeType(ct: string): PRFile['status'] {
     const lower = ct.toLowerCase();
-    if (lower.includes('add')) { return 'added'; }
-    if (lower.includes('delete')) { return 'removed'; }
-    if (lower.includes('rename')) { return 'renamed'; }
-    if (lower.includes('copy')) { return 'copied'; }
+    if (lower.includes('add')) {
+      return 'added';
+    }
+    if (lower.includes('delete')) {
+      return 'removed';
+    }
+    if (lower.includes('rename')) {
+      return 'renamed';
+    }
+    if (lower.includes('copy')) {
+      return 'copied';
+    }
     return 'modified';
   }
 
