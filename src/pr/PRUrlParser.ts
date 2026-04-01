@@ -35,20 +35,21 @@ function parseAzureDevOpsUrl(rawUrl: string): PRCoordinates | null {
     .split('/')
     .filter(Boolean);
 
-  if (segments.length < 5) {
+  // Anchor on the literal `_git` segment — it is unique to Azure DevOps URLs.
+  // All other platforms use /pull/ or /merge_requests/ instead.
+  // We need at least: {collection-or-org} + {project} + _git + {repo} + pullrequest + {id}
+  const gitIndex = segments.indexOf('_git');
+  if (gitIndex < 2) {
+    // gitIndex === -1  → not an ADO URL
+    // gitIndex === 0/1 → not enough segments before _git for a valid project path
     return null;
   }
 
-  const project = segments[segments.length - 5];
-  const gitMarker = segments[segments.length - 4];
-  const repo = segments[segments.length - 3];
-  const prMarker = segments[segments.length - 2];
-  const prId = segments[segments.length - 1];
+  const repo = segments[gitIndex + 1];
+  const prMarker = segments[gitIndex + 2];
+  const prId = segments[gitIndex + 3];
 
-  if (!project || !gitMarker || !repo || !prMarker || !prId) {
-    return null;
-  }
-  if (gitMarker !== '_git') {
+  if (!repo || !prMarker || !prId) {
     return null;
   }
   if (!/^pullrequests?$/i.test(prMarker)) {
@@ -58,37 +59,33 @@ function parseAzureDevOpsUrl(rawUrl: string): PRCoordinates | null {
     return null;
   }
 
+  // segments[0]  = collection (on-prem) or org (dev.azure.com)
+  // segments[1]  = team project name
+  // segments[2..gitIndex-1] = any extra browser-navigation path segments that
+  //                           the ADO web UI adds but the REST API does not need
+  // segments[gitIndex]      = '_git'
+  // segments[gitIndex+1]    = git repository name
+  const collection = segments[0]!;
+  const project = segments[1]!;
+
   const hostname = parsed.hostname;
-  const isDevAzure = hostname === 'dev.azure.com';
   const isVSO = hostname.endsWith('.visualstudio.com');
 
-  const apiBaseSegments = segments.slice(0, -5);
-
-  // For visualstudio.com, rewrite to dev.azure.com so API calls use the
-  // canonical host (both hosts serve the API, but dev.azure.com is preferred).
   let apiBase: string;
   let owner: string;
 
-  if (isDevAzure) {
-    // https://dev.azure.com/{org}/… — org is first path segment
-    apiBase =
-      apiBaseSegments.length > 0
-        ? `${parsed.origin}/${apiBaseSegments.join('/')}`
-        : parsed.origin;
-    owner = apiBaseSegments[0] ?? hostname;
-  } else if (isVSO) {
-    // https://{org}.visualstudio.com/… — org is subdomain; rewrite to dev.azure.com
+  if (isVSO) {
+    // https://{org}.visualstudio.com/… — rewrite to dev.azure.com canonical form.
+    // Both hosts serve the REST API, but dev.azure.com is the preferred endpoint.
     const org = hostname.replace(/\.visualstudio\.com$/i, '');
     apiBase = `https://dev.azure.com/${org}`;
     owner = org;
   } else {
-    // Custom domain or on-prem server — keep original host + any collection prefix
-    apiBase =
-      apiBaseSegments.length > 0
-        ? `${parsed.origin}/${apiBaseSegments.join('/')}`
-        : parsed.origin;
-    // Best-effort owner: first path segment (collection name) or hostname
-    owner = apiBaseSegments[0] ?? hostname;
+    // dev.azure.com:        apiBase = https://dev.azure.com/{org}
+    // Custom / on-prem:     apiBase = https://{host}/{collection}
+    // In both cases the collection/org is segments[0] — the first path segment.
+    apiBase = `${parsed.origin}/${collection}`;
+    owner = collection;
   }
 
   return {
